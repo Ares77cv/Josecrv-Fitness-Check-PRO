@@ -13,22 +13,62 @@ st.set_page_config(
 )
 
 # --- ESTILOS CSS PERSONALIZADOS ---
+# --- ESTILOS CSS PERSONALIZADOS (ACTUALIZADO) ---
 st.markdown("""
     <style>
-    /* Estilos para el modo oscuro elegante */
-    .main { background-color: #0E1117; color: #FAFAFA; }
-    .css-1d391kg { background-color: #1F2833; color: #FAFAFA; }
-    h1, h2, h3, h4, h5, h6 { color: #FF4B4B; font-family: 'Montserrat', sans-serif; }
+    /* Fondo general */
+    .main {
+        background-color: #0E1117; 
+        color: #FAFAFA; 
+    }
+    /* Sidebar */
+    .css-1d391kg {
+        background-color: #1F2833; 
+        color: #FAFAFA;
+    }
+    /* Títulos principales */
+    h1, h2, h3, h4, h5, h6 {
+        color: #FF4B4B; 
+        font-family: 'Montserrat', sans-serif;
+    }
+    /* Botones y Alerts (sin cambios) */
     .stButton>button { background-color: #FF4B4B; color: white; border-radius: 8px; font-size: 1.1em; }
     .stButton>button:hover { background-color: #FF7070; color: black; }
     .stAlert { border-radius: 8px; border-left: 5px solid #FF4B4B; background-color: #2D3A45; color: #FAFAFA; }
     .stAlert.success { border-left-color: #4CAF50; } 
     .stAlert.warning { border-left-color: #FFC107; } 
-    .st-dg { background-color: #1F2833; border-radius: 8px; padding: 15px; margin-bottom: 10px; border: 1px solid #FF4B4B; }
+
+    /* FIX: Estilo para los métricos (st.metric) */
+    .st-dg { 
+        background-color: #1F2833;
+        border-radius: 8px;
+        padding: 15px;
+        margin-bottom: 10px;
+        border: 1px solid #FF4B4B;
+        color: #FAFAFA !important; /* Asegura que el texto general sea blanco */
+    }
+    /* FIX: Asegura que el valor (el número grande) del métrico sea blanco */
+    .st-emotion-cache-12t9kbi > div > div:nth-child(2) > div,
+    .st-emotion-cache-12t9kbi p,
+    .st-emotion-cache-1100w0f p {
+        color: #FAFAFA !important;
+    }
+
+    /* FIX: Asegura que el texto de la tabla (st.table) sea legible */
+    .stTable {
+        color: #FAFAFA !important;
+    }
+
+    /* Input fields y elementos de entrada (sin cambios) */
+    .stNumberInput, .stSelectbox, .stRadio, .stSlider {
+        background-color: #2D3A45;
+        color: #FAFAFA;
+        border-radius: 5px;
+        padding: 5px;
+    }
     .css-1r6dm1s { gap: 2rem; }
     </style>
 """, unsafe_allow_html=True)
-
 
 # --- FUNCIÓN DE ANÁLISIS REAL CON GEMINI ---
 
@@ -186,6 +226,7 @@ paypal_button_html = """
 </form>
 """
 st.markdown(paypal_button_html, unsafe_allow_html=True)
+
 
 
 st.caption("Josecrv90 Fitness Check PRO © 2025 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
