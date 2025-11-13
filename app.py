@@ -2,7 +2,11 @@ import streamlit as st
 import pandas as pd
 from PIL import Image
 import io
-import google.genai # Librería de Gemini
+import json
+import google.genai 
+from google.oauth2.service_account import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 
 # --- CONFIGURACIÓN DE PÁGINA Y ESTILOS ---
 st.set_page_config(
@@ -12,74 +16,47 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- ESTILOS CSS PERSONALIZADOS ---
-# --- ESTILOS CSS PERSONALIZADOS (ACTUALIZADO) ---
+# Estilos CSS para el modo oscuro (con fix para métricas)
 st.markdown("""
     <style>
     /* Fondo general */
-    .main {
-        background-color: #0E1117; 
-        color: #FAFAFA; 
-    }
+    .main { background-color: #0E1117; color: #FAFAFA; }
     /* Sidebar */
-    .css-1d391kg {
-        background-color: #1F2833; 
-        color: #FAFAFA;
-    }
+    .css-1d391kg { background-color: #1F2833; color: #FAFAFA; }
     /* Títulos principales */
-    h1, h2, h3, h4, h5, h6 {
-        color: #FF4B4B; 
-        font-family: 'Montserrat', sans-serif;
-    }
-    /* Botones y Alerts (sin cambios) */
+    h1, h2, h3, h4, h5, h6 { color: #FF4B4B; font-family: 'Montserrat', sans-serif; }
+    /* Botones y Alerts */
     .stButton>button { background-color: #FF4B4B; color: white; border-radius: 8px; font-size: 1.1em; }
     .stButton>button:hover { background-color: #FF7070; color: black; }
     .stAlert { border-radius: 8px; border-left: 5px solid #FF4B4B; background-color: #2D3A45; color: #FAFAFA; }
-    .stAlert.success { border-left-color: #4CAF50; } 
-    .stAlert.warning { border-left-color: #FFC107; } 
 
-    /* FIX: Estilo para los métricos (st.metric) */
+    /* FIX: Estilo para métricos y tablas */
     .st-dg { 
         background-color: #1F2833;
         border-radius: 8px;
         padding: 15px;
         margin-bottom: 10px;
         border: 1px solid #FF4B4B;
-        color: #FAFAFA !important; /* Asegura que el texto general sea blanco */
-    }
-    /* FIX: Asegura que el valor (el número grande) del métrico sea blanco */
-    .st-emotion-cache-12t9kbi > div > div:nth-child(2) > div,
-    .st-emotion-cache-12t9kbi p,
-    .st-emotion-cache-1100w0f p {
         color: #FAFAFA !important;
     }
-
-    /* FIX: Asegura que el texto de la tabla (st.table) sea legible */
+    .st-emotion-cache-12t9kbi > div > div:nth-child(2) > div,
+    .st-emotion-cache-12t9kbi p,
+    .st-emotion-cache-1100w0f p,
     .stTable {
         color: #FAFAFA !important;
     }
-
-    /* Input fields y elementos de entrada (sin cambios) */
-    .stNumberInput, .stSelectbox, .stRadio, .stSlider {
-        background-color: #2D3A45;
-        color: #FAFAFA;
-        border-radius: 5px;
-        padding: 5px;
-    }
-    .css-1r6dm1s { gap: 2rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- FUNCIÓN DE ANÁLISIS REAL CON GEMINI ---
+
+# --- FUNCIONES DE CLOUD ---
 
 def analyze_physique_with_gemini(uploaded_file):
     """Llama a la API de Gemini para analizar la imagen."""
-    
     try:
-        # Intenta obtener la clave de Streamlit Secrets
         api_key = st.secrets["GEMINI_API_KEY"]
     except KeyError:
-        return "❌ ERROR: Clave GEMINI_API_KEY no encontrada. Configúrala en 'Edit Secrets' de Streamlit Cloud."
+        return "❌ ERROR: Clave GEMINI_API_KEY no encontrada."
 
     try:
         client = google.genai.Client(api_key=api_key)
@@ -88,29 +65,15 @@ def analyze_physique_with_gemini(uploaded_file):
         return f"❌ ERROR al inicializar cliente Gemini: {e}"
 
     try:
+        # Asegúrate de que el puntero esté al inicio para Gemini
+        uploaded_file.seek(0)
         image = Image.open(uploaded_file)
     except Exception as e:
         return f"❌ ERROR al cargar la imagen: {e}"
 
-    # Prompt Detallado para obtener un análisis de fitness
-    prompt = """
-    Eres un entrenador personal y analista de físico experto. Analiza la imagen deportiva. Genera una respuesta SÓLO en formato Markdown, con los siguientes encabezados, siendo muy específico:
-
-    ### 🧠 Evaluación Detallada del Físico
-    - Estimación de % Grasa Corporal (Ej: ~15%):
-    - Índice de Simetría (Ej: 8.5/10):
-    - Estimación de Masa Muscular (Ej: Nivel intermedio-avanzado):
-
-    ### 🟢 Puntos Fuertes Detectados
-    - Menciona al menos 3 grupos musculares o aspectos estéticos fuertes.
-
-    ### 🔴 Áreas de Oportunidad (Mejora)
-    - Menciona al menos 3 grupos musculares que necesiten mayor volumen o desarrollo.
-
-    ### 🎯 Recomendaciones de Entrenamiento
-    - Ofrece 3 sugerencias específicas de entrenamiento basadas en las áreas de oportunidad.
-    """
-
+    # Prompt Detallado
+    prompt = "Eres un entrenador personal y analista de físico experto. Analiza la imagen deportiva. Genera una respuesta SÓLO en formato Markdown, con los siguientes encabezados: ### 🧠 Evaluación Detallada del Físico, ### 🟢 Puntos Fuertes Detectados, ### 🔴 Áreas de Oportunidad (Mejora), ### 🎯 Recomendaciones de Entrenamiento. Sé muy específico en el análisis."
+    
     with st.spinner("🧠 Analizando el físico con Gemini Pro Vision..."):
         try:
             response = client.models.generate_content(
@@ -122,7 +85,46 @@ def analyze_physique_with_gemini(uploaded_file):
             return f"❌ ERROR de la API de Gemini: {e}. Revisa tu clave y cuota."
 
 
-# --- HEADER Y CÁLCULOS (Código Robusto) ---
+def upload_file_to_drive(uploaded_file, user_weight):
+    """Sube el archivo cargado a la carpeta especificada en Google Drive."""
+    try:
+        folder_id = st.secrets["GDRIVE_FOLDER_ID"]
+        service_account_info = json.loads(st.secrets["GDRIVE_SERVICE_ACCOUNT"])
+        
+        creds = Credentials.from_service_account_info(
+            service_account_info,
+            scopes=['https://www.googleapis.com/auth/drive']
+        )
+        service = build('drive', 'v3', credentials=creds)
+    except KeyError:
+        return "❌ Error: Las claves de Google Drive no están en Streamlit Secrets."
+    except Exception as e:
+        return f"❌ Error de Autenticación de Drive: {e}"
+
+    timestamp = pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')
+    file_name = f"Foto_Progreso_{timestamp}_{int(user_weight)}kg_{uploaded_file.name}"
+    
+    file_metadata = {'name': file_name, 'parents': [folder_id]}
+    
+    # Reinicia el puntero del archivo para que la API pueda leerlo
+    uploaded_file.seek(0)
+    media = MediaIoBaseUpload(
+        io.BytesIO(uploaded_file.read()),
+        mimetype=uploaded_file.type
+    )
+
+    try:
+        service.files().create(
+            body=file_metadata,
+            media_body=media,
+            fields='id'
+        ).execute()
+        return f"✅ Foto guardada en Drive: {file_name}"
+    except Exception as e:
+        return f"❌ Error al subir a Drive: {e}. Revisa los permisos de la Cuenta de Servicio."
+
+
+# --- HEADER Y CÁLCULOS (Lógica de Macros) ---
 
 st.title("🔥 Josecrv Fitness Check PRO")
 st.markdown("<p style='font-size: 1.2em; color: #BBBBBB;'>Tu compañero inteligente para optimizar tu nutrición y analizar tu físico con precisión.</p>", unsafe_allow_html=True)
@@ -137,15 +139,9 @@ with st.sidebar:
     weight = st.number_input("Peso (kg)", min_value=40, max_value=180, value=75)
     
     st.subheader("🏋️ Nivel de Actividad y Objetivo")
-    activity = st.select_slider(
-        "Nivel de Actividad Semanal", 
-        options=["Sedentario", "Ligero (1-2 veces)", "Moderado (3-4 veces)", "Activo (5-6 veces)", "Atleta (Diario)"]
-    )
+    activity = st.select_slider("Nivel de Actividad Semanal", options=["Sedentario", "Ligero (1-2 veces)", "Moderado (3-4 veces)", "Activo (5-6 veces)", "Atleta (Diario)"])
     
-    goal = st.radio(
-        "¿Cuál es tu Objetivo Principal?",
-        ["Definición (Perder Grasa)", "Mantenimiento Corporal", "Volumen (Ganar Músculo)"]
-    )
+    goal = st.radio("¿Cuál es tu Objetivo Principal?", ["Definición (Perder Grasa)", "Mantenimiento Corporal", "Volumen (Ganar Músculo)"])
 
 # LÓGICA DE CÁLCULO (Mifflin-St Jeor)
 if gender == "Hombre": bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5
@@ -179,18 +175,23 @@ with col1:
         st.info(f"Tu Tasa Metabólica Basal (TMB) es de **{int(bmr)} kcal**.")
 
 
-# Columna 2: Análisis de IA
+# Columna 2: Análisis de IA y Subida a Drive
 with col2:
     st.subheader("📸 Análisis Físico por Inteligencia Artificial")
-    st.info("⚠️ **¡REAL!** Este análisis usa la API de Gemini para ver y evaluar la foto.")
-    st.markdown("Sube una imagen de cuerpo completo para la evaluación.")
+    st.info("⚠️ **REAL:** Guarda tu foto en Google Drive y la analiza con Gemini.")
     
     uploaded = st.file_uploader("Sube tu foto aquí (JPG, PNG)", type=["jpg", "png", "jpeg"])
     
     if uploaded:
         st.image(uploaded, caption="Tu imagen cargada", use_column_width=True)
         
-        if st.button("🚀 INICIAR ANÁLISIS REAL DE IA"):
+        if st.button("🚀 INICIAR ANÁLISIS REAL DE IA Y GUARDAR FOTO"):
+            
+            # 1. Subir a Google Drive
+            upload_status = upload_file_to_drive(uploaded, weight)
+            st.success(upload_status)
+            
+            # 2. Ejecutar la IA
             st.session_state['ai_result'] = None
             ai_output = analyze_physique_with_gemini(uploaded)
             st.session_state['ai_result'] = ai_output
@@ -209,12 +210,10 @@ st.markdown("---")
 st.markdown("## 🎉 Apoya el Desarrollo de la App")
 st.markdown("""
     <p style='font-size: 1.1em; color: #BBBBBB;'>
-    Si te gusta la aplicación y el análisis de la IA te ha sido útil,
-    considera una pequeña donación para ayudar a cubrir los costos de la API y el desarrollo.
+    Si te gusta la aplicación, considera una pequeña donación para cubrir los costos de la API y el desarrollo.
     </p>
 """, unsafe_allow_html=True)
 
-# Código HTML del botón de PayPal
 paypal_button_html = """
 <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank">
     <input type="hidden" name="cmd" value="_donations" />
@@ -228,5 +227,4 @@ paypal_button_html = """
 st.markdown(paypal_button_html, unsafe_allow_html=True)
 
 
-
-st.caption("Josecrv90 Fitness Check PRO © 2025 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
+st.caption("@Josecrv90 Fitness Check PRO © 2025 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
