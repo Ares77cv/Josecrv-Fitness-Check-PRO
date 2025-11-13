@@ -1,4 +1,0 @@
-streamlit
-pandas
-numpy
-google-genai # Librería oficial para la API de Gemini
