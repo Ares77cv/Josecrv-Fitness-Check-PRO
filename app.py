@@ -189,4 +189,3 @@ st.markdown(paypal_button_html, unsafe_allow_html=True)
 
 
 st.caption("Josecrv90 Fitness Check PRO © 2025 - Impulsado por IA y Ciencia. Gracias por tu apoyo.")
-
